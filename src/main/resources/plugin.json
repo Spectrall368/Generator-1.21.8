@@ -1,6 +1,12 @@
 {
-  "id": "generator-1.21.8",
+  "id": "generator-${mcVersion}",
+  "supportedversions": [${supportedVersion}],
   "info": {
-    "name": "Minecraft 1.21.8 Java Edition generator"
+    "name": "NeoForge ${mcVersion} Generator",
+    "version": "${pluginVersion}",
+    "description": "This plugin includes a mod, datapack and resourcepack generator for NeoForge ${mcVersion}",
+    "author": "_Spectrall",
+    "updateJSONURL": "https://raw.githubusercontent.com/Spectrall368/Generator-${mcVersion}/${mcreatorVersion}/update.json",
+    "pluginPageID": 120231
   }
 }
