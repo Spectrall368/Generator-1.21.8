@@ -110,16 +110,10 @@ package ${package}.client.renderer;
 	<#assign stateForAnimations = "EntityRenderState">
 </#if>
 
+<#assign needsEntityInState = false>
+
 <@javacompress>
 public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${name}Entity, ${renderState}, ${model}> {
-
-	<#-- This entity reference is shared for all entities as renderer only has one instance.
-		 This currently works, but is somewhat hacky. It works because all methods requiring it
-		 are called after extractRenderState where this entity is assigned to the current entity.
-		 On the other hand, vanilla code reuses state for all entities too, so it may be fine.
-		 If we need to change this, we can use RegisterRenderStateModifiersEvent and
-		 and IRenderStateExtension#setRenderData with custom ContextKey-->
-	private ${name}Entity entity = null;
 
 	private final ResourceLocation entityTexture = ResourceLocation.parse("${modid}:textures/entities/${data.mobModelTexture}");
 
@@ -136,10 +130,15 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 		<#list data.modelLayers as layer>
 		this.addLayer(new RenderLayer<>(this) {
 			final ResourceLocation LAYER_TEXTURE = ResourceLocation.parse("${modid}:textures/entities/${layer.texture}");
+			<#if layer.model != "Default">
+				final EntityModel LAYER_MODEL = new ${layer.model}(Minecraft.getInstance().getEntityModels().bakeLayer(${layer.model}.LAYER_LOCATION));
+			</#if>
 
 			<@javacompress>
 			@Override public void render(PoseStack poseStack, MultiBufferSource bufferSource, int light, ${renderState} state, float headYaw, float headPitch) {
 				<#if hasProcedure(layer.condition)>
+				<#assign needsEntityInState = true>
+				Entity entity = state.getRenderData(ENTITY_KEY);
 				Level world = entity.level();
 				double x = entity.getX();
 				double y = entity.getY();
@@ -149,9 +148,8 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 
 				VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.<#if layer.glow>eyes<#else>entityCutoutNoCull</#if>(LAYER_TEXTURE));
 				<#if layer.model != "Default">
-					EntityModel model = new ${layer.model}(Minecraft.getInstance().getEntityModels().bakeLayer(${layer.model}.LAYER_LOCATION));
-					model.setupAnim(state);
-					model.renderToBuffer(poseStack, vertexConsumer, light,
+					LAYER_MODEL.setupAnim(state);
+					LAYER_MODEL.renderToBuffer(poseStack, vertexConsumer, light,
 						<#if layer.disableHurtOverlay>OverlayTexture.NO_OVERLAY<#else>LivingEntityRenderer.getOverlayCoords(state, 0)</#if>);
 				<#else>
 					this.getParentModel().renderToBuffer(poseStack, vertexConsumer, light,
@@ -171,12 +169,6 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 
 	@Override public void extractRenderState(${name}Entity entity, ${renderState} state, float partialTicks) {
 		super.extractRenderState(entity, state, partialTicks);
-		this.entity = entity;
-		<#if data.animations?has_content>
-		if (this.model instanceof AnimatedModel) {
-			((AnimatedModel) this.model).setEntity(entity);
-		}
-		</#if>
 		<#if data.mobModelName == "Villager" || data.mobModelName == "Witch">
 		if (state instanceof HoldingEntityRenderState holdingState) {
 			this.itemModelResolver.updateForLiving(holdingState.heldItem, entity.getMainHandItem(), ItemDisplayContext.GROUND, entity);
@@ -191,6 +183,8 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 	<#if data.mobModelName == "Villager" || data.breedable || (data.visualScale?? && (data.visualScale.getFixedValue() != 1 || hasProcedure(data.visualScale)))>
 	@Override protected void scale(${renderState} state, PoseStack poseStack) {
 		<#if hasProcedure(data.visualScale)>
+			<#assign needsEntityInState = true>
+			Entity entity = state.getRenderData(ENTITY_KEY);
 			Level world = entity.level();
 			double x = entity.getX();
 			double y = entity.getY();
@@ -204,7 +198,7 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 			poseStack.scale(0.9375f, 0.9375f, 0.9375f);
 		</#if>
 		<#if data.breedable>
-			poseStack.scale(entity.getAgeScale(), entity.getAgeScale(), entity.getAgeScale());
+			poseStack.scale(state.ageScale, state.ageScale, state.ageScale);
 		</#if>
 	}
 	</#if>
@@ -212,6 +206,8 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 	<#if data.transparentModelCondition?? && (hasProcedure(data.transparentModelCondition) || data.transparentModelCondition.getFixedValue())>
 	@Override protected boolean isBodyVisible(${renderState} state) {
 		<#if hasProcedure(data.transparentModelCondition)>
+		<#assign needsEntityInState = true>
+		Entity entity = state.getRenderData(ENTITY_KEY);
 		Level world = entity.level();
 		double x = entity.getX();
 		double y = entity.getY();
@@ -224,6 +220,8 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 	<#if data.isShakingCondition?? && (hasProcedure(data.isShakingCondition) || data.isShakingCondition.getFixedValue())>
 	@Override protected boolean isShaking(${renderState} state) {
 		<#if hasProcedure(data.isShakingCondition)>
+		<#assign needsEntityInState = true>
+		Entity entity = state.getRenderData(ENTITY_KEY);
 		Level world = entity.level();
 		double x = entity.getX();
 		double y = entity.getY();
@@ -235,8 +233,6 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 
 	<#if data.animations?has_content>
 	private static final class AnimatedModel extends ${model} {
-
-		private ${name}Entity entity = null;
 
 		<#list data.animations as animation>
 		private final KeyframeAnimation keyframeAnimation${animation?index};
@@ -257,10 +253,6 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 			} catch (IllegalArgumentException e) {
 				return new AnimationDefinition(0, false, Map.of()).bake(root);
 			}
-		}
-
-		public void setEntity(${name}Entity entity) {
-			this.entity = entity;
 		}
 
 		<#if stateForAnimations == "EntityRenderState"><#-- special handling for silverfish and slime -->
@@ -284,8 +276,28 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 	}
 	</#if>
 
+	<#if needsEntityInState>
+	public static final ContextKey<${name}Entity> ENTITY_KEY = new ContextKey<>(ResourceLocation.parse("${modid}:${registryname}_entity"));
+
+	@EventBusSubscriber(Dist.CLIENT) public static class EntityStateAdder {
+
+		@SubscribeEvent private static void registerRenderStateModifiersEvent(RegisterRenderStateModifiersEvent event) {
+			event.registerEntityModifier(${name}Renderer.class, (entity, state) -> state.setRenderData(ENTITY_KEY, entity));
+		}
+
+	}
+	</#if>
+
 }
 </@javacompress>
+
+<#macro ensureEntityReference>
+	<#if !(entityReferenceCreated!false)>
+		<#assign needsEntityInState = true>
+		${name}Entity entity = state.getRenderData(ENTITY_KEY);
+		<#assign entityReferenceCreated = true>
+	</#if>
+</#macro>
 
 <#macro setupAnim>
 	<#if !humanoid> <#-- HumanoidModel resets its pose in its setupAnim which is called before this one for this special case -->
@@ -293,9 +305,11 @@ public class ${name}Renderer extends <#if humanoid>Humanoid</#if>MobRenderer<${n
 	</#if>
 	<#list data.animations as animation>
 		<#if !animation.walking>
+			<@ensureEntityReference/>
 			this.keyframeAnimation${animation?index}.apply(entity.animationState${animation?index}, state.ageInTicks, ${animation.speed}f);
 		<#else>
 			<#if hasProcedure(animation.condition)>
+			<@ensureEntityReference/>
 			if (<@procedureCode animation.condition, {
 				"x": "entity.getX()",
 				"y": "entity.getY()",
