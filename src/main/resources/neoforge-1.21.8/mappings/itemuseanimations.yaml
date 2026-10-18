@@ -4,7 +4,6 @@ eat: ItemUseAnimation.EAT
 drink: ItemUseAnimation.DRINK
 block: ItemUseAnimation.BLOCK
 bow: ItemUseAnimation.BOW
-trident: ItemUseAnimation.TRIDENT
 crossbow: ItemUseAnimation.CROSSBOW
 spyglass: ItemUseAnimation.SPYGLASS
 toot_horn: ItemUseAnimation.TOOT_HORN
